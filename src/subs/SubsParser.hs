@@ -107,8 +107,8 @@ exprsParser = do
     where
         commaExprsParser :: Parser [Expr]
         commaExprsParser = do
-            p <- option $ schar ',' >> expr1Parser >> commaExprsParser
-            case p of
+            op <- option $ schar ',' >> expr1Parser >> commaExprsParser
+            case op of
                 Just p -> return p
                 _      -> return []
 
@@ -122,10 +122,9 @@ afterIdentParser ident =
 expr1Parser :: Parser Expr
 expr1Parser = expr2
         <|> do { e1 <- expr2; _ <- schar '*'; e2 <- expr1Parser; return $ Call "*" (e1:[e2])}
-        <|> do { e1 <- expr2; _ <- schar '/'; e2 <- expr1Parser; return $ Call "/" (e1:[e2])}
+        <|> do { e1 <- expr2; _ <- schar '%'; e2 <- expr1Parser; return $ Call "%" (e1:[e2])}
         <|> do { e1 <- expr2; _ <- schar '+'; e2 <- expr1Parser; return $ Call "+" (e1:[e2])}
         <|> do { e1 <- expr2; _ <- schar '-'; e2 <- expr1Parser; return $ Call "-" (e1:[e2])}
-        <|> do { e1 <- expr2; _ <- schar '%'; e2 <- expr1Parser; return $ Call "%" (e1:[e2])}
         <|> do { e1 <- expr2; _ <- schar '<'; e2 <- expr1Parser; return $ Call "<" (e1:[e2])}
         <|> do { e1 <- expr2; _ <- symbol "==="; e2 <- expr1Parser; return $ Call "===" (e1:[e2])}
         where
@@ -135,6 +134,7 @@ expr1Parser = expr2
                 <|> do { _ <- symbol "false"; return FalseConst }
                 <|> do { _ <- symbol "undefined"; return Undefined }
                 <|> do { i <- identParser; afterIdentParser i }
+                <|> do { _ <- schar '['; exprs <- exprsParser; _ <- schar ']'; return $ Array exprs}
 
 
 exprParser :: Parser Expr
