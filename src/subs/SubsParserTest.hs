@@ -2,17 +2,21 @@
 {-# LANGUAGE TemplateHaskell #-}
 module SubsParserTest where
 
+import Control.Monad ( replicateM )
 import Test.HUnit
 import Test.QuickCheck
 import Data.Char
 
 import SimpleParse
 import SubsParser
+import SubsAst
 
 -- Unit tests
 
+-- Ident parser
+
 testIdentParser = TestCase $
-    assertEqual "for integerParser \"foo\"," [("foo", [])] (parseEof identParser "foo")
+    assertEqual "for identParser \"foo\"," [("foo", [])] (parseEof identParser "foo")
 testValidIdentWithOnlyDigits = TestCase $
     assertEqual "for identParser \"123\"," [] (parseEof identParser "123")
 testValidIdentWithDigits = TestCase $
@@ -24,11 +28,28 @@ testInvalidIdentDash = TestCase $
 testInvalidIdentKeyword = TestCase $
     assertEqual "for identParser \"var\"," [] $ parseEof identParser "var"
 
+-- Number parser
+
+testGoodNumberParse = TestCase $
+    assertEqual "for numberParser \"12345678\"" [(Number 12345678, [])] (parseEof numberParser "12345678")
+testGoodNegativeNumberParse = TestCase $
+    assertEqual "for numberParser \"-12345678\"" [(Number (-12345678), [])] (parseEof numberParser "-12345678")
+
+testBadNegativeNumberFail = TestCase $
+    assertEqual "for numberParser \"- 12345678\"" [] (parseEof numberParser "- 12345678")
+testTooLongNumberFail = TestCase $
+    assertEqual "for numberParser \"123456789\"" [] (parseEof numberParser "123456789")
+
+
 tests = TestList [
     testIdentParser,
     testValidIdentWithOnlyDigits,
     testValidIdentWithDigits,
-    testInvalidIdentKeyword]
+    testInvalidIdentKeyword,
+    testGoodNumberParse,
+    testGoodNegativeNumberParse,
+    testBadNegativeNumberFail,
+    testTooLongNumberFail]
 
 -- QuickCheck
 
@@ -52,7 +73,6 @@ instance Arbitrary ValidIdent where
         str <- stringGen
         return $ VI $ firstC : str
         where
-
             firstCharGen :: Gen Char
             firstCharGen = arbitrary `suchThat` (\ c -> isLetter c || c == '_')
             stringGen :: Gen String
@@ -74,6 +94,22 @@ instance Arbitrary InvalidIdent where
 prop_ValidIdent (Spaces sp)(VI s) = parseEof identParser (sp ++ s) == [(s, [])]
 
 prop_InvalidIDent (II s) = null $ parseEof identParser s
+
+
+-- Number Parser
+
+newtype ValidNumber = VN String
+    deriving (Eq, Show)
+
+instance Arbitrary ValidNumber where
+    arbitrary = do
+        mi <- arbitrary
+        len <- choose(1,8)
+        n <- replicateM len (arbitrary `suchThat` isDigit)
+        if mi then return $ VN $ '-' : n else return $ VN n
+
+prop_ValidNumber (Spaces sp) (VN n) = parseEof numberParser (sp ++ n) == [(Number $ read n, [])]
+
 
 return []
 runTests = $quickCheckAll

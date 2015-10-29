@@ -59,7 +59,7 @@ ArrayCompr  ::= ϵ
 
 -----}
 
---import Control.Applicative ( Applicative(..), Alternative((<|>), empty, many) )
+import Control.Applicative ( Applicative(..), Alternative((<|>), empty, many) )
 import Data.Char
 
 import SubsAst
@@ -80,6 +80,26 @@ identParser = do
     where
         firstIsDigit (c:_) = isDigit c
         firstIsDigit []    = False
+
+
+numberParser :: Parser Expr
+numberParser = do
+    _ <- spaces
+    neg <- option $ char '-'
+    n <- munch1 isDigit
+    let number = read n in  -- Not completely safe as read may crash
+        if number > 99999999 then fail "Too many digits in number"
+                        else
+                            case neg of
+                                Just m  -> return $ Number $ -number
+                                Nothing -> return $ Number number
+
+
+exprParser :: Parser Expr
+exprParser =
+    numberParser <|>
+    do _ <- symbol "true"; return TrueConst
+
 
 
 
