@@ -10,6 +10,7 @@ import Data.Char
 import SimpleParse
 import SubsParser
 import SubsAst
+import SubsAstArbitrary
 
 -- Unit tests
 
@@ -53,30 +54,8 @@ tests = TestList [
 
 -- QuickCheck
 
-newtype Spaces = Spaces String
-    deriving (Eq, Show)
-
-newtype ValidIdent = VI String
-    deriving (Eq, Show)
-
 newtype InvalidIdent = II String
     deriving (Eq, Show)
-
-instance Arbitrary Spaces where
-    arbitrary = do
-        s <- listOf $ arbitrary `suchThat` isSpace
-        return $ Spaces s
-
-instance Arbitrary ValidIdent where
-    arbitrary = do
-        firstC <- firstCharGen
-        str <- stringGen
-        return $ VI $ firstC : str
-        where
-            firstCharGen :: Gen Char
-            firstCharGen = arbitrary `suchThat` (\ c -> isLetter c || c == '_')
-            stringGen :: Gen String
-            stringGen = listOf $ arbitrary `suchThat` (\ c -> isDigit c || isLetter c || c == '_')
 
 -- Can be extended to provide more invalid cases
 instance Arbitrary InvalidIdent where
@@ -116,11 +95,29 @@ prop_ValidNumber (Spaces sp) (VN n) = parseEof numberParser (sp ++ n) == [(Numbe
 newtype ValidExpr = VE String
     deriving (Eq, Show)
 
+-- instance Arbitrary ValidExpr where
+--     arbitrary = do
+--         VN n <- arbitrary
+--         VI i <- arbitrary
+--         Spaces s1 <- arbitrary
+--         Spaces s2 <- arbitrary
+--         elements [VE n,
+--                   VE "true",
+--                   VE "false",
+--                   VE "undefined",
+--                   VE $ n ++ ", true",
+--                   VE $ n ++ s1 ++ "*" ++ s2 ++ n,
+--                   VE $ n ++ s1 ++ "/" ++ s2 ++ n,
+--                   VE $ n ++ s1 ++ "+" ++ s2 ++ n,
+--                   VE $ n ++ s1 ++ "-" ++ s2 ++ n,
+--                   VE i,
+--                   VE $ i ++ s1 ++ "=" ++ s2 ++ n]
+
 instance Arbitrary ValidExpr where
     arbitrary = do
-        VN n <- arbitrary
-        elements [VE n, VE "true", VE "false", VE "undefined",
-                  VE $ n ++ ", true", VE $ n ++ " * " ++ n]
+        e <- arbitrary
+        return $ VE (prettyPrintExpr e)
+
 
 prop_ValidExpr (VE expr) = parseEof exprParser expr /= []
 

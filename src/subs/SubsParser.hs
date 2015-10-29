@@ -43,7 +43,6 @@ Expr2     ::=  Number
             |  `undefined`
 
 
-
 AfterIdent ::= ϵ
             |  `=` Expr1
             |  FunCall
@@ -99,16 +98,49 @@ numberParser = do
                                 Nothing -> return $ Number number
 
 
-exprParser :: Parser Expr
-exprParser = do {e1 <- expr1; _ <- schar ','; e2 <- exprParser; return $ Comma e1 e2}
-       <|> expr1
+exprsParser :: Parser [Expr]
+exprsParser = do
+    op <- option $ expr1Parser >> commaExprsParser
+    case op of
+        Just p -> return p
+        _      -> return []
     where
-        expr1 = expr2
-            <|> do { e1 <- expr2; _ <- schar '*'; e2 <- expr1; return $ Call "*" (e1:[e2])}
-        expr2 = numberParser
-            <|> do { _ <- symbol "true"; return TrueConst }
-            <|> do { _ <- symbol "false"; return FalseConst }
-            <|> do { _ <- symbol "undefined"; return Undefined }
+        commaExprsParser :: Parser [Expr]
+        commaExprsParser = do
+            p <- option $ schar ',' >> expr1Parser >> commaExprsParser
+            case p of
+                Just p -> return p
+                _      -> return []
+
+
+afterIdentParser :: Ident -> Parser Expr
+afterIdentParser ident =
+    do _ <- schar '='; expr <- expr1Parser; return $ Assign ident expr
+    <|> return (Var ident)
+
+
+expr1Parser :: Parser Expr
+expr1Parser = expr2
+        <|> do { e1 <- expr2; _ <- schar '*'; e2 <- expr1Parser; return $ Call "*" (e1:[e2])}
+        <|> do { e1 <- expr2; _ <- schar '/'; e2 <- expr1Parser; return $ Call "/" (e1:[e2])}
+        <|> do { e1 <- expr2; _ <- schar '+'; e2 <- expr1Parser; return $ Call "+" (e1:[e2])}
+        <|> do { e1 <- expr2; _ <- schar '-'; e2 <- expr1Parser; return $ Call "-" (e1:[e2])}
+        <|> do { e1 <- expr2; _ <- schar '%'; e2 <- expr1Parser; return $ Call "%" (e1:[e2])}
+        <|> do { e1 <- expr2; _ <- schar '<'; e2 <- expr1Parser; return $ Call "<" (e1:[e2])}
+        <|> do { e1 <- expr2; _ <- symbol "==="; e2 <- expr1Parser; return $ Call "===" (e1:[e2])}
+        where
+            expr2 = numberParser
+                <|> do { _ <- schar '"'; s <- munch (/= '"'); _ <- schar '"'; return $ String s}
+                <|> do { _ <- symbol "true"; return TrueConst }
+                <|> do { _ <- symbol "false"; return FalseConst }
+                <|> do { _ <- symbol "undefined"; return Undefined }
+                <|> do { i <- identParser; afterIdentParser i }
+
+
+exprParser :: Parser Expr
+exprParser = do {e1 <- expr1Parser; _ <- schar ','; e2 <- exprParser; return $ Comma e1 e2}
+       <|> expr1Parser
+
 
 
 
