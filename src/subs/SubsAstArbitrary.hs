@@ -57,7 +57,7 @@ instance Arbitrary Expr where
             superArb :: Int -> Gen Expr
             superArb n = frequency [(5, commaArb n),
                                     (10, constArb n),
-                                    (5, simpleOptArb n), 
+                                    (5, simpleOptArb n),
                                     (1, arrayArb n)]
             commaArb :: Int -> Gen Expr
             commaArb 0 = constArb 0
@@ -96,7 +96,7 @@ instance Arbitrary Expr where
 
 prettyPrintExpr  :: Expr -> String
 prettyPrintExpr (Number n)    = show n
-prettyPrintExpr (String s)    = '"' : s ++ "\""
+prettyPrintExpr (String s)    = '\'' : s ++ "'"
 prettyPrintExpr Undefined     = "undefined"
 prettyPrintExpr TrueConst     = "true"
 prettyPrintExpr FalseConst    = "false"

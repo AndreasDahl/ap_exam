@@ -15,7 +15,7 @@ Program ::= Stms
 Stms ::= ϵ
       |  Stm `;` Stms
 
-Stm  ::= var Ident AssignOpt
+Stm  ::= `var` Ident AssignOpt
       |  Expr
 
 AssignOpt  ::= ϵ
@@ -31,16 +31,16 @@ Expr1      ::= Expr2
             |  Expr2 `%` Expr1
             |  Expr2 `<` Expr1
             |  Expr2 `===` Expr1
-            |  Ident AfterIdent
-            |  `[` Exprs `]`
-            |  `[` `for` `(` Ident `of` Expr `)` ArrayCompr Expr `]`
-            |  `(` Expr `)`
 
 Expr2     ::=  Number
             |  String
             |  `true`
             |  `false`
             |  `undefined`
+            |  Ident AfterIdent
+            |  `[` Exprs `]`
+            |  `[` `for` `(` Ident `of` Expr `)` ArrayCompr Expr `]`
+            |  `(` Expr `)`
 
 
 AfterIdent ::= ϵ
@@ -99,24 +99,50 @@ numberParser = do
 
 
 exprsParser :: Parser [Expr]
-exprsParser = do
-    op <- option $ expr1Parser >> commaExprsParser
-    case op of
-        Just p -> return p
-        _      -> return []
+exprsParser = nextParser
     where
         commaExprsParser :: Parser [Expr]
         commaExprsParser = do
-            op <- option $ schar ',' >> expr1Parser >> commaExprsParser
-            case op of
-                Just p -> return p
-                _      -> return []
+                                _ <- schar ','
+                                nextParser
+                        <|> return []
+        nextParser :: Parser [Expr]
+        nextParser = do
+                        e <- expr1Parser
+                        c <- commaExprsParser
+                        return $ e : c
+                    <|> return []
 
 
 afterIdentParser :: Ident -> Parser Expr
 afterIdentParser ident =
     do _ <- schar '='; expr <- expr1Parser; return $ Assign ident expr
     <|> return (Var ident)
+    <|> funCallParser ident
+    where
+        funCallParser :: Ident -> Parser Expr
+        funCallParser i1 = do { _ <- schar '.'; i2 <- identParser; funCallParser (i1 ++ "." ++ i2) }
+                          <|> do { _ <- schar '('; exprs <- exprsParser; _ <- schar ')'; return $ Call i1 exprs}
+
+
+arrayComprParser :: Parser (Maybe ArrayCompr)
+arrayComprParser = option (
+    do
+        _ <- symbol "if"
+        _ <- schar '('
+        e <- exprParser
+        _ <- schar ')'
+        a <- arrayComprParser
+        return $ ArrayIf e a
+    <|> do
+        _ <- symbol "for"
+        _ <- schar '('
+        i <- identParser
+        _ <- symbol "of"
+        e <- exprParser
+        _ <- schar ')'
+        a <- arrayComprParser
+        return $ ArrayForCompr (i, e, a))
 
 
 expr1Parser :: Parser Expr
@@ -129,12 +155,26 @@ expr1Parser = expr2
         <|> do { e1 <- expr2; _ <- symbol "==="; e2 <- expr1Parser; return $ Call "===" (e1:[e2])}
         where
             expr2 = numberParser
-                <|> do { _ <- schar '"'; s <- munch (/= '"'); _ <- schar '"'; return $ String s}
+                <|> do { _ <- schar '\''; s <- munch (/= '\''); _ <- schar '\''; return $ String s}
                 <|> do { _ <- symbol "true"; return TrueConst }
                 <|> do { _ <- symbol "false"; return FalseConst }
                 <|> do { _ <- symbol "undefined"; return Undefined }
                 <|> do { i <- identParser; afterIdentParser i }
                 <|> do { _ <- schar '['; exprs <- exprsParser; _ <- schar ']'; return $ Array exprs}
+                <|> do { _ <- schar '('; e <- exprParser; _ <- schar ')'; return e}
+                <|> do
+                    _ <- schar '['
+                    _ <- symbol "for"
+                    _ <- schar '('
+                    i <- identParser
+                    _ <- symbol "of"
+                    e1 <- exprParser
+                    _ <- schar ')'
+                    a <- arrayComprParser
+                    e2 <- exprParser
+                    _ <- schar ']'
+                    return $ Compr (i, e1, a) e2
+
 
 
 exprParser :: Parser Expr
@@ -142,10 +182,40 @@ exprParser = do {e1 <- expr1Parser; _ <- schar ','; e2 <- exprParser; return $ C
        <|> expr1Parser
 
 
+assignOptParser :: Parser (Maybe Expr)
+assignOptParser = option $ schar '=' >> exprParser
+
+
+stmtParser :: Parser Stm
+stmtParser = do
+                _ <- symbol "var"
+                i <- identParser
+                a <- assignOptParser
+                return $ VarDecl i a
+         <|> do { e <- exprParser; return $ ExprAsStm e}
+
+
+
+stmtsParser :: Parser [Stm]
+stmtsParser = do
+                  stmt  <- stmtParser
+                  _     <- schar ';'
+                  stmts <- stmtsParser
+                  return $ stmt:stmts
+         <|> return []
+
+
+
+programParser :: Parser Program
+programParser = do {statements <- stmtsParser; return $ Prog statements}
+
 
 
 parseString :: String -> Either ParseError Program
-parseString = undefined
+parseString input = let ret = do { cs <- programParser; _ <- spaces; return cs } in
+    case parseEof ret input of
+    [(prog, "")] -> return prog
+    f -> Left $ ParseError $ show f  -- TODO: Better error message
 
 parseFile :: FilePath -> IO (Either ParseError Program)
 parseFile path = parseString <$> readFile path
