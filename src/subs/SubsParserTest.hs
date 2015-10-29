@@ -111,5 +111,18 @@ instance Arbitrary ValidNumber where
 prop_ValidNumber (Spaces sp) (VN n) = parseEof numberParser (sp ++ n) == [(Number $ read n, [])]
 
 
+-- Expr Parser
+
+newtype ValidExpr = VE String
+    deriving (Eq, Show)
+
+instance Arbitrary ValidExpr where
+    arbitrary = do
+        VN n <- arbitrary
+        elements [VE n, VE "true", VE "false", VE "undefined",
+                  VE $ n ++ ", true", VE $ n ++ " * " ++ n]
+
+prop_ValidExpr (VE expr) = parseEof exprParser expr /= []
+
 return []
 runTests = $quickCheckAll

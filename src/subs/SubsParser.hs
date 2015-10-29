@@ -21,24 +21,28 @@ Stm  ::= var Ident AssignOpt
 AssignOpt  ::= ϵ
             |  `=` Expr
 
-Expr       ::= Expr `,` Expr
+Expr       ::= Expr1 `,` Expr
             |  Expr1
 
-Expr1      ::= Number
-            |  String
-            |  `true`
-            |  `false`
-            |  `undefined`
-            |  Expr1 `+` Expr1
-            |  Expr1 `-` Expr1
-            |  Expr1 `*` Expr1
-            |  Expr1 `%` Expr1
-            |  Expr1 `<` Expr1
-            |  Expr1 `===` Expr1
+Expr1      ::= Expr2
+            |  Expr2 `+` Expr1
+            |  Expr2 `-` Expr1
+            |  Expr2 `*` Expr1
+            |  Expr2 `%` Expr1
+            |  Expr2 `<` Expr1
+            |  Expr2 `===` Expr1
             |  Ident AfterIdent
             |  `[` Exprs `]`
             |  `[` `for` `(` Ident `of` Expr `)` ArrayCompr Expr `]`
             |  `(` Expr `)`
+
+Expr2     ::=  Number
+            |  String
+            |  `true`
+            |  `false`
+            |  `undefined`
+
+
 
 AfterIdent ::= ϵ
             |  `=` Expr1
@@ -59,7 +63,7 @@ ArrayCompr  ::= ϵ
 
 -----}
 
-import Control.Applicative ( Applicative(..), Alternative((<|>), empty, many) )
+import Control.Applicative ( Alternative((<|>)) )
 import Data.Char
 
 import SubsAst
@@ -91,15 +95,20 @@ numberParser = do
         if number > 99999999 then fail "Too many digits in number"
                         else
                             case neg of
-                                Just m  -> return $ Number $ -number
+                                Just _  -> return $ Number $ -number
                                 Nothing -> return $ Number number
 
 
 exprParser :: Parser Expr
-exprParser =
-    numberParser <|>
-    do _ <- symbol "true"; return TrueConst
-
+exprParser = do {e1 <- expr1; _ <- schar ','; e2 <- exprParser; return $ Comma e1 e2}
+       <|> expr1
+    where
+        expr1 = expr2
+            <|> do { e1 <- expr2; _ <- schar '*'; e2 <- expr1; return $ Call "*" (e1:[e2])}
+        expr2 = numberParser
+            <|> do { _ <- symbol "true"; return TrueConst }
+            <|> do { _ <- symbol "false"; return FalseConst }
+            <|> do { _ <- symbol "undefined"; return Undefined }
 
 
 
