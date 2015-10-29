@@ -1,8 +1,11 @@
-module SubsParser (
+module SubsParser
+{-(
   ParseError(..),
   parseString,
   parseFile
-) where
+)
+-}
+ where
 
 
 {----- GRAMMAR -----
@@ -26,19 +29,19 @@ Expr1      ::= Number
             |  `true`
             |  `false`
             |  `undefined`
-            |  Expr `+` Expr
-            |  Expr `-` Expr
-            |  Expr `*` Expr
-            |  Expr `%` Expr
-            |  Expr `<` Expr
-            |  Expr `===` Expr
+            |  Expr1 `+` Expr1
+            |  Expr1 `-` Expr1
+            |  Expr1 `*` Expr1
+            |  Expr1 `%` Expr1
+            |  Expr1 `<` Expr1
+            |  Expr1 `===` Expr1
             |  Ident AfterIdent
             |  `[` Exprs `]`
             |  `[` `for` `(` Ident `of` Expr `)` ArrayCompr Expr `]`
             |  `(` Expr `)`
 
 AfterIdent ::= ϵ
-            |  `=` Expr
+            |  `=` Expr1
             |  FunCall
 
 FunCall    ::= `.` Ident FunCall
@@ -68,13 +71,15 @@ data ParseError = ParseError String
 
 
 keywords :: [String]
-keywords = 
+keywords = ["var", "true", "false", "undefined", "for", "of", "if"]
 
 identParser :: Parser Ident
 identParser = do
     s <- token $ munch1 $ \ c -> isLetter c || c == '_' || isDigit c
-    return s
-
+    if firstIsDigit s || s `elem` keywords then reject else return s
+    where
+        firstIsDigit (c:_) = isDigit c
+        firstIsDigit []    = False
 
 
 

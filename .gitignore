@@ -30,3 +30,7 @@ rel/example_project
 
 # OSX
 .DS_Store
+
+# ???
+.tags
+.tags1
