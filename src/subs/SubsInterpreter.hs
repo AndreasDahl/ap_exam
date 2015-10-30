@@ -34,36 +34,62 @@ type Primitive = [Value] -> SubsM Value
 type PEnv = Map FunName Primitive
 type Context = (Env, PEnv)
 
-initialContext :: Context 
+
+initialContext :: Context
 initialContext = (Map.empty, initialPEnv)
   where initialPEnv =
           Map.fromList [ ("===", undefined)
                        , ("<", undefined)
-                       , ("+", undefined)
-                       , ("*", undefined)
-                       , ("-", undefined)
-                       , ("%", undefined)
+                       , ("+", plusOp)
+                       , ("*", mulOp)
+                       , ("-", minusOp)
+                       , ("%", divOp)
                        , ("Array.new", arrayNew)
                        ]
 
 newtype SubsM a = SubsM {runSubsM :: Context -> Either Error (a, Env)}
 
+
 instance Functor SubsM where
-  fmap = undefined
+  fmap = liftM
 
 instance Applicative SubsM where
-  pure = undefined
-  (<*>) = undefined
+  pure = return
+  fm <*> xm = do f <- fm
+                 c <- xm
+                 return $ f c
 
 instance Monad SubsM where
-  return x = undefined
-  f >>= m = undefined
-  fail s = undefined
+  return x = SubsM $ \context -> Right (x, fst context)
+  f >>= m = SubsM $ \c@(e, pe) -> do (v1, e1) <- runSubsM f c
+                                     (v2, e2) <- runSubsM (m v1) (e1, pe)
+                                     return (v2, e2)
+  fail s = SubsM $ \ _ -> Left $ Error s
+
+
+mulOp :: Primitive
+mulOp (IntVal a:[IntVal b]) = return $ IntVal (a * b)
+mulOp _ = fail "'*' called with non-number arguments"
+
+
+divOp :: Primitive
+divOp (IntVal a:[IntVal b]) = return $ IntVal (a `quot` b)
+divOp _ = fail "'%' called with non-number arguments"
+
+
+plusOp :: Primitive
+plusOp (IntVal a:[IntVal b]) = return $ IntVal (a + b)
+plusOp _ = fail "'+' called with non-number arguments"
+
+
+minusOp :: Primitive
+minusOp (IntVal a:[IntVal b]) = return $ IntVal (a - b)
+minusOp _ = fail "'-' called with non-number arguments"
 
 
 arrayNew :: Primitive
-arrayNew [IntVal n] | n > 0 = return $ ArrayVal(take n $ repeat UndefinedVal)
-arrayNew _ = fail ("Array.new called with wrong number of arguments")
+arrayNew [IntVal n] | n > 0 = return $ ArrayVal(replicate n UndefinedVal)
+arrayNew _ = fail "Array.new called with wrong number of arguments"
 
 modify :: (Env -> Env) -> SubsM ()
 modify f = undefined
@@ -73,7 +99,7 @@ updateEnv name val = undefined
 
 getVar :: Ident -> SubsM Value
 getVar name = undefined
-  
+
 getFunction :: FunName -> SubsM Primitive
 getFunction name = undefined
 
