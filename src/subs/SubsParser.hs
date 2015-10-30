@@ -42,7 +42,6 @@ Expr2     ::=  Number
             |  `[` `for` `(` Ident `of` Expr `)` ArrayCompr Expr `]`
             |  `(` Expr `)`
 
-
 AfterIdent ::= ϵ
             |  `=` Expr1
             |  FunCall
@@ -71,6 +70,18 @@ import SimpleParse
 
 data ParseError = ParseError String
                 deriving (Show, Eq)
+
+
+-- Greedy chainl1
+-- Almost identical to chainl1 in SimpleParse
+gchainl1         :: Parser a -> Parser (a -> a -> a) -> Parser a
+p `gchainl1` op   = do a <- p
+                       rest a
+                   where
+                      rest a = do f <- op
+                                  b <- p
+                                  rest (f a b)
+                               <++ return a
 
 
 keywords :: [String]
@@ -116,9 +127,9 @@ exprsParser = nextParser
 
 afterIdentParser :: Ident -> Parser Expr
 afterIdentParser ident =
-    do _ <- schar '='; expr <- expr1Parser; return $ Assign ident expr
-    <|> return (Var ident)
+    do expr <- schar '=' >> expr1Parser; return $ Assign ident expr
     <|> funCallParser ident
+    <|> return (Var ident)
     where
         funCallParser :: Ident -> Parser Expr
         funCallParser i1 = do { _ <- schar '.'; i2 <- identParser; funCallParser (i1 ++ "." ++ i2) }
@@ -128,25 +139,18 @@ afterIdentParser ident =
 arrayComprParser :: Parser (Maybe ArrayCompr)
 arrayComprParser = option (
     do
-        _ <- symbol "if"
-        _ <- schar '('
-        e <- exprParser
-        _ <- schar ')'
-        a <- arrayComprParser
+        e <- symbol "if" >> schar '(' >> exprParser
+        a <- schar ')' >> arrayComprParser
         return $ ArrayIf e a
     <|> do
-        _ <- symbol "for"
-        _ <- schar '('
-        i <- identParser
-        _ <- symbol "of"
-        e <- exprParser
-        _ <- schar ')'
-        a <- arrayComprParser
+        i <- symbol "for" >> schar '(' >> identParser
+        e <- symbol "of" >> exprParser
+        a <- schar ')' >> arrayComprParser
         return $ ArrayForCompr (i, e, a))
 
 
 expr1Parser :: Parser Expr
-expr1Parser = expr2 `chainl1` mulOp `chainl1` addOp `chainl1` lessOp `chainl1` eqOp 
+expr1Parser = expr2 `gchainl1` mulOp `gchainl1` addOp `gchainl1` lessOp `gchainl1` eqOp
         where
             mulOp :: Parser (Expr -> Expr -> Expr)
             mulOp  = do { _ <- schar '*';    return $ expectTwo $ Call "*" }

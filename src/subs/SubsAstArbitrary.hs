@@ -70,7 +70,7 @@ instance Arbitrary Expr where
             constArb size = do
                 n <- choose(-99999999, 99999999)
                 VI i <- resize size arbitrary
-                s <- vectorOf size $ arbitrary `suchThat` (/= '"')
+                s <- vectorOf size $ arbitrary `suchThat` (/= '\'')
                 elements [Number n,
                           String s,
                           Undefined,
