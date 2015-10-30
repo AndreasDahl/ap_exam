@@ -105,19 +105,43 @@ arrayNew [IntVal n] | n > 0 = return $ ArrayVal(replicate n UndefinedVal)
 arrayNew _ = fail "Array.new called with wrong number of arguments"
 
 modify :: (Env -> Env) -> SubsM ()
-modify f = undefined
+modify f = SubsM modify'
+    where modify' c = Right ((), f (fst c))
 
 updateEnv :: Ident -> Value -> SubsM ()
-updateEnv name val = undefined
+updateEnv name val = SubsM updateEnv'
+    where updateEnv' c = Right ((), Map.insert name val (fst c))
 
 getVar :: Ident -> SubsM Value
-getVar name = undefined
+getVar name = SubsM getVar'
+    where getVar' c = case Map.lookup name (fst c) of
+            Just v  -> Right (v, fst c)
+            Nothing -> Left $ Error $ "Variable ''" ++ name ++ "'' not in scope"
+
 
 getFunction :: FunName -> SubsM Primitive
-getFunction name = undefined
+getFunction name = SubsM getFunction'
+    where getFunction' c = case Map.lookup name (snd c) of
+            Just f  -> Right (f, fst c)
+            Nothing -> Left $ Error $ "Function ''" ++ name ++ "'' not in scope"
+
 
 evalExpr :: Expr -> SubsM Value
-evalExpr expr = undefined
+evalExpr (Number n)   = return $ IntVal n
+evalExpr (String s)   = return $ StringVal s
+evalExpr (Array es)   = do { values <- mapM evalExpr es; return $ ArrayVal values }
+evalExpr Undefined    = return UndefinedVal
+evalExpr TrueConst    = return TrueVal
+evalExpr FalseConst   = return FalseVal
+evalExpr (Var i)      = getVar i
+evalExpr (Assign i e) = do
+    v <- evalExpr e
+    updateEnv i v >> return v
+evalExpr (Call name es) = do
+    f <- getFunction name
+    args <- mapM evalExpr es
+    f args
+evalExpr _ = undefined
 
 stm :: Stm -> SubsM ()
 stm s = undefined
