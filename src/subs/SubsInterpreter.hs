@@ -38,8 +38,8 @@ type Context = (Env, PEnv)
 initialContext :: Context
 initialContext = (Map.empty, initialPEnv)
   where initialPEnv =
-          Map.fromList [ ("===", undefined)
-                       , ("<", undefined)
+          Map.fromList [ ("===", eqOp)
+                       , ("<", lessOp)
                        , ("+", plusOp)
                        , ("*", mulOp)
                        , ("-", minusOp)
@@ -67,6 +67,17 @@ instance Monad SubsM where
   fail s = SubsM $ \ _ -> Left $ Error s
 
 
+eqOp :: Primitive
+eqOp (a:[b]) = if a == b then return TrueVal else return FalseVal
+eqOp _ = fail "'===' called with non-number arguments"
+
+
+lessOp :: Primitive
+lessOp (IntVal a:[IntVal b]) = if a < b then return TrueVal else return FalseVal
+lessOp (StringVal a:[StringVal b]) = if a < b then return TrueVal else return FalseVal
+lessOp _ = fail "'<' called with non-number arguments"
+
+
 mulOp :: Primitive
 mulOp (IntVal a:[IntVal b]) = return $ IntVal (a * b)
 mulOp _ = fail "'*' called with non-number arguments"
@@ -79,6 +90,8 @@ divOp _ = fail "'%' called with non-number arguments"
 
 plusOp :: Primitive
 plusOp (IntVal a:[IntVal b]) = return $ IntVal (a + b)
+plusOp (StringVal a:[IntVal b]) = return $ StringVal (a ++ show b)
+plusOp (IntVal a:[StringVal b]) = return $ StringVal (show a ++ b)
 plusOp _ = fail "'+' called with non-number arguments"
 
 
