@@ -146,14 +146,18 @@ arrayComprParser = option (
 
 
 expr1Parser :: Parser Expr
-expr1Parser = expr2
-        <|> do { e1 <- expr2; _ <- schar '*'; e2 <- expr1Parser; return $ Call "*" (e1:[e2])}
-        <|> do { e1 <- expr2; _ <- schar '%'; e2 <- expr1Parser; return $ Call "%" (e1:[e2])}
-        <|> do { e1 <- expr2; _ <- schar '+'; e2 <- expr1Parser; return $ Call "+" (e1:[e2])}
-        <|> do { e1 <- expr2; _ <- schar '-'; e2 <- expr1Parser; return $ Call "-" (e1:[e2])}
-        <|> do { e1 <- expr2; _ <- schar '<'; e2 <- expr1Parser; return $ Call "<" (e1:[e2])}
-        <|> do { e1 <- expr2; _ <- symbol "==="; e2 <- expr1Parser; return $ Call "===" (e1:[e2])}
+expr1Parser = expr2 `chainl1` mulOp `chainl1` addOp `chainl1` lessOp `chainl1` eqOp 
         where
+            mulOp :: Parser (Expr -> Expr -> Expr)
+            mulOp  = do { _ <- schar '*';    return $ expectTwo $ Call "*" }
+                 <|> do { _ <- schar '%';    return $ expectTwo $ Call "%" }
+            addOp  = do { _ <- schar '+';    return $ expectTwo $ Call "+" }
+                 <|> do { _ <- schar '-';    return $ expectTwo $ Call "-" }
+            lessOp = do { _ <- schar '<';    return $ expectTwo $ Call "<" }
+            eqOp   = do { _ <- symbol "==="; return $ expectTwo $ Call "===" }
+            expectTwo :: ([a] -> a) -> a -> a -> a
+            expectTwo f a b = f (a:[b])
+
             expr2 = numberParser
                 <|> do { _ <- schar '\''; s <- munch (/= '\''); _ <- schar '\''; return $ String s}
                 <|> do { _ <- symbol "true"; return TrueConst }
