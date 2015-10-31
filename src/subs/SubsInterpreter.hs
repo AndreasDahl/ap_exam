@@ -131,39 +131,6 @@ getFunction name = SubsM getFunction'
             Nothing -> Left $ Error $ "Function '" ++ name ++ "' not in scope"
 
 
-exprFilter :: Expr -> SubsM Bool
-exprFilter e = do
-    value <- evalExpr e
-    case value of
-        TrueVal  -> return True
-        FalseVal -> return False
-        _        -> fail "If expression not of boolean value"
-
-
-forAll :: Maybe ArrayCompr -> Expr -> SubsM [Value]
-forAll Nothing e = sequence [evalExpr e]
-forAll (Just (ArrayForCompr (i, arrayE, more))) e = do
-    array <- evalExpr arrayE
-    case array of
-        ArrayVal vs -> liftM concat $ mapM (\value -> updateEnv i value >> forAll more e) vs
-        StringVal s -> liftM concat $ mapM (\char -> updateEnv i (StringVal [char]) >> forAll more e) s
-        _ -> fail $ "Expression '" ++ show arrayE ++ "' must be an array or a string"
-forAll (Just (ArrayIf filt more)) e = do
-    result <- evalExpr filt
-    case result of
-        TrueVal  -> forAll more e
-        FalseVal -> return []
-        _        -> fail "if statement should evaluate to a boolean"
-
-
-evalArrayCompr :: ArrayCompr -> Expr -> SubsM Value
-evalArrayCompr ac e = do
-    oldEnv <- getEnv
-    result <- forAll (Just ac) e
-    _      <- modify (const oldEnv)  -- Restore old Env
-    return $ ArrayVal result
-
-
 evalExpr :: Expr -> SubsM Value
 evalExpr (Number n)   = return $ IntVal n
 evalExpr (String s)   = return $ StringVal s
@@ -180,7 +147,28 @@ evalExpr (Call name es) = do
     args <- mapM evalExpr es
     f args
 evalExpr (Comma l r)    = evalExpr l >> evalExpr r
-evalExpr (Compr afor e2) = evalArrayCompr (ArrayForCompr afor) e2
+evalExpr (Compr afor e) = do
+    oldEnv <- getEnv
+    result <- evalArrayCompr (Just (ArrayForCompr afor)) e
+    _      <- modify (const oldEnv)  -- Restore old Env
+    return $ ArrayVal result
+        where
+            evalArrayCompr :: Maybe ArrayCompr -> Expr -> SubsM [Value]
+            evalArrayCompr Nothing e = sequence [evalExpr e]
+            evalArrayCompr (Just (ArrayForCompr (i, arrayE, more))) e = do
+                array <- evalExpr arrayE
+                case array of
+                    ArrayVal vs -> liftM concat $
+                        mapM (\value -> updateEnv i value >> evalArrayCompr more e) vs
+                    StringVal s -> liftM concat $
+                        mapM (\char -> updateEnv i (StringVal [char]) >> evalArrayCompr more e) s
+                    _ -> fail $ "Expression '" ++ show arrayE ++ "' should be an array or a string"
+            evalArrayCompr (Just (ArrayIf filt more)) e = do
+                result <- evalExpr filt
+                case result of
+                    TrueVal  -> evalArrayCompr more e
+                    FalseVal -> return []
+                    _        -> fail "if statement should evaluate to a boolean"
 
 
 stm :: Stm -> SubsM ()
