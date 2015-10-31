@@ -40,6 +40,13 @@ testProg = Prog [
                     (Assign "i" (Call "+" [Var "i", Number 1]))))
     ]
 
+scopeProg = Prog [
+    VarDecl "x" (Just (Number 42)),
+    VarDecl "y" (Just (Compr ("x", String "abc", Nothing) (Var "x"))),
+    VarDecl "z" (Just (Var "x"))
+    ]
+
+
 -- testInterpProg1 = TestCase $
 --     (runProg testProg1)
 --

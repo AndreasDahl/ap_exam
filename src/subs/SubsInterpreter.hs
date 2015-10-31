@@ -135,26 +135,26 @@ exprFilter e = do
         _        -> fail "If expression not of boolean value"
 
 
-forAll :: Ident -> Expr -> Expr -> Maybe ArrayCompr -> SubsM [Value]
-forAll i arrayE e more = do
+forAll :: Maybe ArrayCompr -> Expr -> SubsM [Value]
+forAll Nothing e = sequence [evalExpr e]
+forAll (Just (ArrayForCompr (i, arrayE, more))) e = do
     array <- evalExpr arrayE
     case array of
-        ArrayVal vs -> case more of
-            Nothing                -> mapM (\value -> updateEnv i value >> evalExpr e) vs
-            Just (ArrayIf nestE _) -> do  -- TODO: more nesting
-                v2 <- filterM (\value -> updateEnv i value >> exprFilter nestE) vs
-                mapM (\value -> updateEnv i value >> evalExpr e) v2
-            Just (ArrayForCompr (i2, e2, nest)) ->
-                liftM concat $ mapM (\value -> do
-                    v2 <- forAll i2 e2 e nest
-                    mapM (\value2 -> updateEnv i value2 >> evalExpr e) v2) vs
-        _ -> fail $ "Expression '" ++ show arrayE ++ "'' is not an array"
+        ArrayVal vs -> liftM concat $ mapM (\value -> updateEnv i value >> forAll more e) vs
+        StringVal s -> liftM concat $ mapM (\char -> updateEnv i (StringVal [char]) >> forAll more e) s
+        _ -> fail $ "Expression '" ++ show arrayE ++ "' must be an array or a string"
+forAll (Just (ArrayIf filt more)) e = do
+    result <- evalExpr filt
+    case result of
+        TrueVal  -> forAll more e
+        FalseVal -> return []
+        _        -> fail "if statement does not evaluate to a boolean"
 
 
 evalArrayCompr :: ArrayCompr -> Expr -> SubsM Value
-evalArrayCompr (ArrayForCompr (i, e1, more)) e2 = do
-    arr         <- forAll i e1 e2 more
-    return $ ArrayVal arr
+evalArrayCompr ac e = do
+    result <- forAll (Just ac) e
+    return $ ArrayVal result
 -- evalArrayCompr (ArrayIf e1 Nothing) e2 = do
 --     ArrayVal vs <- evalExpr e1
 --     arr         <- ifAll vs e2
