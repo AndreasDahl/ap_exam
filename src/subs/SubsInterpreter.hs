@@ -112,6 +112,11 @@ updateEnv :: Ident -> Value -> SubsM ()
 updateEnv name val = modify $ Map.insert name val
 
 
+getEnv :: SubsM Env
+getEnv = SubsM getEnv'
+    where getEnv' c = Right (fst c, fst c)
+
+
 getVar :: Ident -> SubsM Value
 getVar name = SubsM getVar'
     where getVar' c = case Map.lookup name (fst c) of
@@ -148,17 +153,15 @@ forAll (Just (ArrayIf filt more)) e = do
     case result of
         TrueVal  -> forAll more e
         FalseVal -> return []
-        _        -> fail "if statement does not evaluate to a boolean"
+        _        -> fail "if statement should evaluate to a boolean"
 
 
 evalArrayCompr :: ArrayCompr -> Expr -> SubsM Value
 evalArrayCompr ac e = do
+    oldEnv <- getEnv
     result <- forAll (Just ac) e
+    _      <- modify (const oldEnv)  -- Restore old Env
     return $ ArrayVal result
--- evalArrayCompr (ArrayIf e1 Nothing) e2 = do
---     ArrayVal vs <- evalExpr e1
---     arr         <- ifAll vs e2
---     return $ ArrayVal arr
 
 
 evalExpr :: Expr -> SubsM Value
