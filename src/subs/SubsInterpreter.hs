@@ -1,8 +1,8 @@
 module SubsInterpreter
-       ( runProg
-       , Error (..)
-       , Value(..)
-       )
+    --    ( runProg
+    --    , Error (..)
+    --    , Value(..)
+    --    )
        where
 
 import SubsAst
@@ -61,7 +61,7 @@ instance Applicative SubsM where
 
 instance Monad SubsM where
   return x = SubsM $ \context -> Right (x, fst context)
-  f >>= m = SubsM $ \c@(e, pe) -> do (v1, e1) <- runSubsM f c
+  f >>= m = SubsM $ \c@(_, pe) -> do (v1, e1) <- runSubsM f c
                                      (v2, e2) <- runSubsM (m v1) (e1, pe)
                                      return (v2, e2)
   fail s = SubsM $ \ _ -> Left $ Error s
@@ -84,7 +84,7 @@ mulOp _ = fail "'*' called with non-number arguments"
 
 
 divOp :: Primitive
-divOp (IntVal a:[IntVal b]) = return $ IntVal (a `quot` b)
+divOp (IntVal a:[IntVal b]) = return $ IntVal (a `mod` b)
 divOp _ = fail "'%' called with non-number arguments"
 
 
@@ -109,21 +109,56 @@ modify f = SubsM modify'
     where modify' c = Right ((), f (fst c))
 
 updateEnv :: Ident -> Value -> SubsM ()
-updateEnv name val = SubsM updateEnv'
-    where updateEnv' c = Right ((), Map.insert name val (fst c))
+updateEnv name val = modify $ Map.insert name val
+
 
 getVar :: Ident -> SubsM Value
 getVar name = SubsM getVar'
     where getVar' c = case Map.lookup name (fst c) of
             Just v  -> Right (v, fst c)
-            Nothing -> Left $ Error $ "Variable ''" ++ name ++ "'' not in scope"
+            Nothing -> Left $ Error $ "Variable '" ++ name ++ "' not in scope"
 
 
 getFunction :: FunName -> SubsM Primitive
 getFunction name = SubsM getFunction'
     where getFunction' c = case Map.lookup name (snd c) of
             Just f  -> Right (f, fst c)
-            Nothing -> Left $ Error $ "Function ''" ++ name ++ "'' not in scope"
+            Nothing -> Left $ Error $ "Function '" ++ name ++ "' not in scope"
+
+
+exprFilter :: Expr -> SubsM Bool
+exprFilter e = do
+    value <- evalExpr e
+    case value of
+        TrueVal  -> return True
+        FalseVal -> return False
+        _        -> fail "If expression not of boolean value"
+
+
+forAll :: Ident -> Expr -> Expr -> Maybe ArrayCompr -> SubsM [Value]
+forAll i arrayE e more = do
+    array <- evalExpr arrayE
+    case array of
+        ArrayVal vs -> case more of
+            Nothing                -> mapM (\value -> updateEnv i value >> evalExpr e) vs
+            Just (ArrayIf nestE _) -> do  -- TODO: more nesting
+                v2 <- filterM (\value -> updateEnv i value >> exprFilter nestE) vs
+                mapM (\value -> updateEnv i value >> evalExpr e) v2
+            Just (ArrayForCompr (i2, e2, nest)) ->
+                liftM concat $ mapM (\value -> do
+                    v2 <- forAll i2 e2 e nest
+                    mapM (\value2 -> updateEnv i value2 >> evalExpr e) v2) vs
+        _ -> fail $ "Expression '" ++ show arrayE ++ "'' is not an array"
+
+
+evalArrayCompr :: ArrayCompr -> Expr -> SubsM Value
+evalArrayCompr (ArrayForCompr (i, e1, more)) e2 = do
+    arr         <- forAll i e1 e2 more
+    return $ ArrayVal arr
+-- evalArrayCompr (ArrayIf e1 Nothing) e2 = do
+--     ArrayVal vs <- evalExpr e1
+--     arr         <- ifAll vs e2
+--     return $ ArrayVal arr
 
 
 evalExpr :: Expr -> SubsM Value
@@ -141,13 +176,19 @@ evalExpr (Call name es) = do
     f <- getFunction name
     args <- mapM evalExpr es
     f args
-evalExpr _ = undefined
+evalExpr (Comma l r)    = evalExpr l >> evalExpr r
+evalExpr (Compr afor e2) = evalArrayCompr (ArrayForCompr afor) e2
+
 
 stm :: Stm -> SubsM ()
-stm s = undefined
+stm (ExprAsStm e)       = void $ evalExpr e
+stm (VarDecl i Nothing) = updateEnv i UndefinedVal
+stm (VarDecl i (Just e))  = do { val <- evalExpr e; updateEnv i val}
 
 program :: Program -> SubsM ()
-program (Prog prog) = undefined
+program (Prog prog) = void $ mapM stm prog
 
 runProg :: Program -> Either Error Env
-runProg prog = undefined
+runProg prog = case runSubsM (program prog) initialContext of
+    Right ((), e) -> Right e
+    Left err      -> Left err
