@@ -143,27 +143,46 @@ evalExpr (Call name es) = do
     f args
 evalExpr (Comma l r)    = evalExpr l >> evalExpr r
 evalExpr (Compr afor e) = do
-    oldEnv <- getEnv
-    result <- evalArrayCompr (Just (ArrayForCompr afor)) e
-    _      <- modify (const oldEnv)  -- Restore old Env
+    result <- evalArrayCompr (Just (ArrayForCompr afor))
     return $ ArrayVal result
         where
-            evalArrayCompr :: Maybe ArrayCompr -> Expr -> SubsM [Value]
-            evalArrayCompr Nothing e = sequence [evalExpr e]
-            evalArrayCompr (Just (ArrayForCompr (i, arrayE, more))) e = do
+            -- Get a variable from the enviornment if it is there
+            tryGetVar :: Ident -> SubsM (Maybe Value)
+            tryGetVar name = SubsM tryGetVar'
+                where tryGetVar' c = case Map.lookup name (fst c) of
+                        Just v  -> Right (Just v, fst c)
+                        Nothing -> Right (Nothing, fst c)
+            -- Clear a variable from the enviornment
+            clearVar :: Ident -> SubsM ()
+            clearVar name = SubsM clearVar'
+                where clearVar' c = Right ((), Map.delete name (fst c))
+            -- Do a function with a specific variable set to given value.
+            -- Returns the variable to it's original state afterwards.
+            doWithTempVar :: Ident -> SubsM a -> SubsM a
+            doWithTempVar i m = do
+                oldVar <- tryGetVar i
+                res    <- m
+                case oldVar of
+                    Just var -> updateEnv i var >> return res
+                    Nothing  -> clearVar i >> return res
+            evalArrayCompr :: Maybe ArrayCompr -> SubsM [Value]
+            evalArrayCompr Nothing = sequence [evalExpr e]
+            evalArrayCompr (Just (ArrayForCompr (i, arrayE, more))) = do
                 array <- evalExpr arrayE
                 case array of
                     ArrayVal vs -> liftM concat $
-                        mapM (\value -> updateEnv i value >> evalArrayCompr more e) vs
+                        doWithTempVar i $
+                        mapM (\value -> updateEnv i value >> evalArrayCompr more) vs
                     StringVal s -> liftM concat $
-                        mapM (\char -> updateEnv i (StringVal [char]) >> evalArrayCompr more e) s
+                        doWithTempVar i $
+                        mapM (\char -> updateEnv i (StringVal [char]) >> evalArrayCompr more) s
                     _ -> fail $ "Expression '" ++ show arrayE ++ "' should be an array or a string"
-            evalArrayCompr (Just (ArrayIf filt more)) e = do
+            evalArrayCompr (Just (ArrayIf filt more)) = do
                 result <- evalExpr filt
                 case result of
-                    TrueVal  -> evalArrayCompr more e
+                    TrueVal  -> evalArrayCompr more
                     FalseVal -> return []
-                    _        -> fail "if statement should evaluate to a boolean"
+                    _        -> fail $ "if statement '" ++ show filt ++ "' should evaluate to a boolean"
 
 
 stm :: Stm -> SubsM ()

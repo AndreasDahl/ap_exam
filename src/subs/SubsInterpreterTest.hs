@@ -9,6 +9,7 @@ import Data.Char
 
 import SubsAst
 import SubsInterpreter
+import SubsAstArbitrary
 
 -- Unit tests
 
@@ -42,7 +43,7 @@ testProg = Prog [
 
 scopeProg = Prog [
     VarDecl "x" (Just (Number 42)),
-    VarDecl "y" (Just (Compr ("x", String "abc", Nothing) (Var "x"))),
+    VarDecl "y" (Just (Compr ("k", String "abc", Nothing) (Var "k"))),
     VarDecl "z" (Just (Var "x"))
     ]
 
@@ -52,6 +53,13 @@ scopeProg = Prog [
 --
 -- tests = TestList [
 --     testInterpProg1]
+
+prop_expr :: Program -> Property
+prop_expr prog
+ = case runProg prog of
+    Right _     -> counterexample "good" True
+    Left (Error reason) -> counterexample reason False
+
 
 return []
 runTests = $quickCheckAll
