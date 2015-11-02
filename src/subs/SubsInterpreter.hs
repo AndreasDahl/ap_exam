@@ -68,41 +68,36 @@ instance Monad SubsM where
 
 
 eqOp :: Primitive
-eqOp (a:[b]) = if a == b then return TrueVal else return FalseVal
+eqOp [a, b] = if a == b then return TrueVal else return FalseVal
 eqOp _ = fail "'===' called with non-number arguments"
 
-
 lessOp :: Primitive
-lessOp (IntVal a:[IntVal b]) = if a < b then return TrueVal else return FalseVal
-lessOp (StringVal a:[StringVal b]) = if a < b then return TrueVal else return FalseVal
+lessOp [IntVal a, IntVal b] = if a < b then return TrueVal else return FalseVal
+lessOp [StringVal a, StringVal b] = if a < b then return TrueVal else return FalseVal
 lessOp _ = fail "'<' called with non-number arguments"
 
-
 mulOp :: Primitive
-mulOp (IntVal a:[IntVal b]) = return $ IntVal (a * b)
+mulOp [IntVal a, IntVal b] = return $ IntVal (a * b)
 mulOp _ = fail "'*' called with non-number arguments"
 
-
 divOp :: Primitive
-divOp (IntVal a:[IntVal b]) = return $ IntVal (a `mod` b)
+divOp [IntVal a, IntVal b] = return $ IntVal (a `mod` b)
 divOp _ = fail "'%' called with non-number arguments"
 
-
 plusOp :: Primitive
-plusOp (IntVal a:[IntVal b]) = return $ IntVal (a + b)
-plusOp (StringVal a:[IntVal b]) = return $ StringVal (a ++ show b)
-plusOp (IntVal a:[StringVal b]) = return $ StringVal (show a ++ b)
+plusOp [IntVal a, IntVal b] = return $ IntVal (a + b)
+plusOp [StringVal a, IntVal b] = return $ StringVal (a ++ show b)
+plusOp [IntVal a, StringVal b] = return $ StringVal (show a ++ b)
 plusOp _ = fail "'+' called with non-number arguments"
 
-
 minusOp :: Primitive
-minusOp (IntVal a:[IntVal b]) = return $ IntVal (a - b)
+minusOp [IntVal a, IntVal b] = return $ IntVal (a - b)
 minusOp _ = fail "'-' called with non-number arguments"
-
 
 arrayNew :: Primitive
 arrayNew [IntVal n] | n > 0 = return $ ArrayVal(replicate n UndefinedVal)
 arrayNew _ = fail "Array.new called with wrong number of arguments"
+
 
 modify :: (Env -> Env) -> SubsM ()
 modify f = SubsM modify'
@@ -121,14 +116,14 @@ getVar :: Ident -> SubsM Value
 getVar name = SubsM getVar'
     where getVar' c = case Map.lookup name (fst c) of
             Just v  -> Right (v, fst c)
-            Nothing -> Left $ Error $ "Variable '" ++ name ++ "' not in scope"
+            Nothing -> fail $ "Variable '" ++ name ++ "' not in scope"
 
 
 getFunction :: FunName -> SubsM Primitive
 getFunction name = SubsM getFunction'
     where getFunction' c = case Map.lookup name (snd c) of
             Just f  -> Right (f, fst c)
-            Nothing -> Left $ Error $ "Function '" ++ name ++ "' not in scope"
+            Nothing -> fail $ "Function '" ++ name ++ "' not in scope"
 
 
 evalExpr :: Expr -> SubsM Value
