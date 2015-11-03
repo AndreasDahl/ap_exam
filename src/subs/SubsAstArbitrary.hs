@@ -92,6 +92,14 @@ instance Arbitrary Expr where
                 exprs <- vectorOf n' (superArb n')
                 return $ Array exprs
 
+instance Arbitrary Stm where
+    
+
+instance Arbitrary Program where
+    arbitrary = do
+        expr <- arbitrary
+        return $ Prog [ExprAsStm expr]
+
 
 
 prettyPrintExpr  :: Expr -> String
