@@ -8,12 +8,12 @@
 
 % Returns {ok, ServerRef} on success or {error, Reason} if some error occurred.
 start(NumReplica, Mod) ->
-    gen_fsm:start({local, coordinator}, coordinator, [{replicas, NumReplica}, {mod, Mod}], []).
+    gen_server:start({local, coordinator}, coordinator, [{replicas, NumReplica}, {mod, Mod}], []).
 
 % Clients waiting for a read or write request should get the reply
 % {'ABORTED', server_stopped}.
 stop(Server) ->
-    gen_fsm:stop(Server).
+    gen_server:stop(Server).
 
 % for sending a read request to a replicated server.
 % The coordinator will forward the request to one of the replica.
@@ -22,7 +22,7 @@ stop(Server) ->
 % exception with value Val, then this function should return
 % {'ABORTED', exception, Val}.
 read(Server, Req) ->
-    gen_fsm:sync_send_event(Server, {read, Req}).
+    gen_server:call(Server, {read, Req}).
 
 % write(ServerRef, Request) for sending a write request to a replicated server.
 % The coordinator will wait until there are no ongoing read nor write requests,
@@ -33,4 +33,4 @@ read(Server, Req) ->
 % If the Mod:handle_write call raises a throw exception with value Val, then
 % this function should return {'ABORTED', exception, Val}.
 write(Server, Req) ->
-    gen_fsm:sync_send_event(Server, {write, Req}).
+    gen_server:call(Server, {write, Req}).

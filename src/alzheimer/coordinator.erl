@@ -1,5 +1,6 @@
 -module(coordinator).
--export([init/1, wait/3, terminate/3]).
+-behaviour(gen_server).
+-export([init/1, handle_call/3, terminate/3]).
 
 
 %%%=========================================================================
@@ -8,22 +9,35 @@
 
 init([{replicas, NumReplica}, {mod, Mod}]) ->
     io:format("init coordinator : ~p ~p~n", [NumReplica, Mod]),
-    {ok, Replica} = gen_fsm:start(replica, {init, self(), Mod}, []),
-    {ok, wait, {wait, Replica}}.
+    Replicas = init_replicas(Mod, NumReplica),
+    {ok, Replicas}.
 
-wait(Event, Caller, {wait, Replica}) ->
+handle_call(Event, Caller, [Replica | Replicas]) ->
     case Event of
         {read, Request} ->
-            io:format("wait coordinator read~n"),
-            gen_fsm:send_event(Replica, {read, Caller, Request}),
-            {next_state, wait, {wait, Replica}};
+            io:format("coordinator read~n"),
+            gen_server:cast(Replica, {read, Caller, Request}),
+            {noreply, [Replica | Replicas]};
         {write, Request} ->
-            io:format("wait coordinator write~n"),
-            gen_fsm:reply(Caller, gen_fsm:sync_send_event(Replica, {write, Request})),
-            {next_state, wait, {wait, Replica}}
+            io:format("coordinator write~n"),
+            Result = gen_server:call(Replica, {write, Request}),
+            case Result of
+                {noupdate, Reply} -> {reply, Reply, [Replica | Replicas]};
+                {updated, Reply, NewState} ->
+                    lists:map(fun(Rep) -> gen_server:call(Rep, {update, NewState}) end, [Replica | Replicas]),
+                    {reply, Reply, [Replica | Replicas]};
+                stop -> gen_server:stop(self())
+            end
     end.
 
 
 
-terminate(_Reason, _StateName, {wait, Replica}) ->
-    gen_fsm:stop(Replica).
+terminate(_Reason, _StateName, Replicas) ->
+    lists:map(fun gen_server:stop/1, Replicas).
+
+% Internals
+
+init_replicas(_, 0) -> [];
+init_replicas(Mod, NumReplica) ->
+    {ok, Replica} = gen_server:start(replica, {init, Mod}, []),
+    [Replica | init_replicas(Mod, NumReplica-1)].
