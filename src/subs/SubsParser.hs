@@ -73,7 +73,8 @@ data ParseError = ParseError String
 
 
 -- Greedy chainl1
--- Almost identical to chainl1 in SimpleParse
+-- Almost identical to chainl1 in SimpleParse, but never considers the case
+-- without the operator if an operator is found.
 gchainl1         :: Parser a -> Parser (a -> a -> a) -> Parser a
 p `gchainl1` op   = do a <- p
                        rest a
@@ -98,11 +99,10 @@ identParser = do
 
 numberParser :: Parser Expr
 numberParser = do
-    _ <- spaces
-    neg <- option $ char '-'
+    neg <- spaces >> option (char '-')
     n <- munch1 isDigit
     let number = read n in  -- Not completely safe as read may crash
-        if number > 99999999 then fail "Too many digits in number"
+        if number > 99999999 then reject
                         else
                             case neg of
                                 Just _  -> return $ Number $ -number
@@ -113,10 +113,8 @@ exprsParser :: Parser [Expr]
 exprsParser = nextParser
     where
         commaExprsParser :: Parser [Expr]
-        commaExprsParser = do
-                                _ <- schar ','
-                                nextParser
-                        <|> return []
+        commaExprsParser = schar ',' >> nextParser
+                       <|> return []
         nextParser :: Parser [Expr]
         nextParser = do
                         e <- expr1Parser
@@ -132,8 +130,13 @@ afterIdentParser ident =
     <|> return (Var ident)
     where
         funCallParser :: Ident -> Parser Expr
-        funCallParser i1 = do { _ <- schar '.'; i2 <- identParser; funCallParser (i1 ++ "." ++ i2) }
-                          <|> do { _ <- schar '('; exprs <- exprsParser; _ <- schar ')'; return $ Call i1 exprs}
+        funCallParser i1 = do
+                           i2 <- schar '.' >> identParser
+                           funCallParser (i1 ++ "." ++ i2)
+                       <|> do
+                           exprs <- schar '(' >> exprsParser
+                           _ <- schar ')'
+                           return $ Call i1 exprs
 
 
 arrayComprParser :: Parser (Maybe ArrayCompr)
@@ -171,14 +174,10 @@ expr1Parser = expr2 `gchainl1` mulOp `gchainl1` addOp `gchainl1` lessOp `gchainl
                 <|> do { _ <- schar '['; exprs <- exprsParser; _ <- schar ']'; return $ Array exprs}
                 <|> do { _ <- schar '('; e <- exprParser; _ <- schar ')'; return e}
                 <|> do
-                    _ <- schar '['
-                    _ <- symbol "for"
-                    _ <- schar '('
+                    _ <- schar '[' >> symbol "for" >> schar '('
                     i <- identParser
-                    _ <- symbol "of"
-                    e1 <- expr1Parser
-                    _ <- schar ')'
-                    a <- arrayComprParser
+                    e1 <- symbol "of" >> expr1Parser
+                    a <- schar ')' >> arrayComprParser
                     e2 <- expr1Parser
                     _ <- schar ']'
                     return $ Compr (i, e1, a) e2
@@ -186,8 +185,12 @@ expr1Parser = expr2 `gchainl1` mulOp `gchainl1` addOp `gchainl1` lessOp `gchainl
 
 
 exprParser :: Parser Expr
-exprParser = do {e1 <- expr1Parser; _ <- schar ','; e2 <- exprParser; return $ Comma e1 e2}
-       <|> expr1Parser
+exprParser = do
+    e1 <- expr1Parser
+    _ <- schar ','
+    e2 <- exprParser
+    return $ Comma e1 e2
+    <|> expr1Parser
 
 
 assignOptParser :: Parser (Maybe Expr)
@@ -196,8 +199,7 @@ assignOptParser = option $ schar '=' >> expr1Parser
 
 stmtParser :: Parser Stm
 stmtParser = do
-                _ <- symbol "var"
-                i <- identParser
+                i <- symbol "var" >> identParser
                 a <- assignOptParser
                 return $ VarDecl i a
          <|> do { e <- exprParser; return $ ExprAsStm e}
