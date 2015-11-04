@@ -19,7 +19,7 @@ Stm  ::= `var` Ident AssignOpt
       |  Expr
 
 AssignOpt  ::= ϵ
-            |  `=` Expr
+            |  `=` Expr1
 
 Expr       ::= Expr1 `,` Expr
             |  Expr1
@@ -39,7 +39,7 @@ Expr2     ::=  Number
             |  `undefined`
             |  Ident AfterIdent
             |  `[` Exprs `]`
-            |  `[` `for` `(` Ident `of` Expr `)` ArrayCompr Expr `]`
+            |  `[` `for` `(` Ident `of` Expr1 `)` ArrayCompr Expr1 `]`
             |  `(` Expr `)`
 
 AfterIdent ::= ϵ
@@ -56,8 +56,8 @@ CommaExprs ::= ϵ
             |  `,` Expr1 CommaExprs
 
 ArrayCompr  ::= ϵ
-             |  `if` `(` Expr `)` ArrayCompr
-             |  `for` `(` Ident `of` Expr `)` ArrayCompr
+             |  `if` `(` Expr1 `)` ArrayCompr
+             |  `for` `(` Ident `of` Expr1 `)` ArrayCompr
 
 -----}
 
@@ -139,12 +139,12 @@ afterIdentParser ident =
 arrayComprParser :: Parser (Maybe ArrayCompr)
 arrayComprParser = option (
     do
-        e <- symbol "if" >> schar '(' >> exprParser
+        e <- symbol "if" >> schar '(' >> expr1Parser
         a <- schar ')' >> arrayComprParser
         return $ ArrayIf e a
     <|> do
         i <- symbol "for" >> schar '(' >> identParser
-        e <- symbol "of" >> exprParser
+        e <- symbol "of" >> expr1Parser
         a <- schar ')' >> arrayComprParser
         return $ ArrayForCompr (i, e, a))
 
@@ -176,10 +176,10 @@ expr1Parser = expr2 `gchainl1` mulOp `gchainl1` addOp `gchainl1` lessOp `gchainl
                     _ <- schar '('
                     i <- identParser
                     _ <- symbol "of"
-                    e1 <- exprParser
+                    e1 <- expr1Parser
                     _ <- schar ')'
                     a <- arrayComprParser
-                    e2 <- exprParser
+                    e2 <- expr1Parser
                     _ <- schar ']'
                     return $ Compr (i, e1, a) e2
 
@@ -191,7 +191,7 @@ exprParser = do {e1 <- expr1Parser; _ <- schar ','; e2 <- exprParser; return $ C
 
 
 assignOptParser :: Parser (Maybe Expr)
-assignOptParser = option $ schar '=' >> exprParser
+assignOptParser = option $ schar '=' >> expr1Parser
 
 
 stmtParser :: Parser Stm
