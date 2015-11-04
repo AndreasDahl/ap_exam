@@ -1,8 +1,8 @@
 -module(gen_replicated).
--export([start/2, stop/1, read/2, write/2]).
+-export([start/2, stop/1, read/2, write/2, test/0]).
 
 
-%%%=========================================================================
+%%%==================================================ß======================
 %%%  API
 %%%=========================================================================
 
@@ -34,3 +34,13 @@ read(Server, Req) ->
 % this function should return {'ABORTED', exception, Val}.
 write(Server, Req) ->
     gen_server:call(Server, {write, Req}).
+
+
+test() ->
+    {ok, Pid} = start(3, simple_mod),
+    write(Pid, one),
+    write(Pid, two),
+    read(Pid, 1),
+    write(Pid, three),
+    read(Pid, 3),
+    stop(Pid).
