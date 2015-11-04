@@ -40,7 +40,8 @@ testBadNegativeNumberFail = TestCase $
     assertEqual "for numberParser \"- 12345678\"" [] (parseEof numberParser "- 12345678")
 testTooLongNumberFail = TestCase $
     assertEqual "for numberParser \"123456789\"" [] (parseEof numberParser "123456789")
-
+testTooLongNegativeNumberFail = TestCase $
+    assertEqual "for numberParser \"-123456789\"" [] (parseEof numberParser "-123456789")
 
 tests = TestList [
     testIdentParser,
@@ -50,7 +51,8 @@ tests = TestList [
     testGoodNumberParse,
     testGoodNegativeNumberParse,
     testBadNegativeNumberFail,
-    testTooLongNumberFail]
+    testTooLongNumberFail,
+    testTooLongNegativeNumberFail]
 
 -- QuickCheck
 
