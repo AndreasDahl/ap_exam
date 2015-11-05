@@ -72,7 +72,7 @@ instance Arbitrary Expr where
                           FalseConst,
                           Var i]
             simpleOptArb :: Int -> Gen Expr
-            simpleOptArb 0 = constArb 0
+            simpleOptArb n | n <= 0 = constArb 0
             simpleOptArb n = let n' = n `quot` 2 in
                 do
                     e1 <- superArb n'
@@ -80,7 +80,7 @@ instance Arbitrary Expr where
                     opt <- elements operators
                     return $ Call opt [e1, e2]
             arrayArb :: Int -> Gen Expr
-            arrayArb 0 = return $ Array []
+            arrayArb n | n <= 0 = return $ Array []
             arrayArb n = let n' = squareRoot n in
                 do
                 exprs <- vectorOf n' (superArb n')
@@ -92,12 +92,14 @@ instance Arbitrary Expr where
                 return $ Assign i expr
             arrayComprArb :: Int -> Gen Expr
             arrayComprArb n = do
-                ArrayForCompr afor <- arbitrary
-                expr <- superArb (n - 1)
-                return $ Compr afor expr
+                VI i <- arbitrary
+                expr1 <- superArb (n - 2)
+                next <- arbitrary
+                expr2 <- superArb (n - 2)
+                return $ Compr (i, expr1, next) expr2
 
 instance Arbitrary ArrayCompr where
-    arbitrary = oneof [forGen, ifGen]
+    arbitrary = scale (`quot` 2) (oneof [forGen, ifGen])
         where
             forGen = do
                 VI i <- arbitrary
