@@ -1,18 +1,17 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-{-# LANGUAGE TemplateHaskell #-}
 module SubsParserTest where
 
-import Test.QuickCheck( counterexample, Property, quickCheckAll )
+import Data.Map( fromList )
+import Test.HUnit
 
 import SubsAst
 import SubsInterpreter
-import SubsAstArbitrary
 
 -- Unit tests
 
 -- Ident parser
 
-testProg = Prog [
+introProg = Prog [
     VarDecl "xs" (
         Just (Array [
             Number 0, Number 1, Number 2,
@@ -44,19 +43,75 @@ scopeProg = Prog [
     VarDecl "z" (Just (Var "x"))
     ]
 
+testInterpAdd = TestCase $
+    assertEqual "Interp addition" (Right (fromList [("x", IntVal (-1))])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "+" [Number 1, Number (-2)]))]
+testInterpAddNumberString = TestCase $
+    assertEqual "Interp addition" (Right (fromList [("x", StringVal "1-2")])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "+" [Number 1, String "-2"]))]
+testInterpAddStrings = TestCase $
+    assertEqual "Interp addition" (Right (fromList [("x", StringVal "Hello, world!")])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "+" [String "Hello, ", String "world!"]))]
 
--- testInterpProg1 = TestCase $
---     (runProg testProg1)
---
--- tests = TestList [
---     testInterpProg1]
+testInterpMult = TestCase $
+    assertEqual "Interp multiplication" (Right (fromList [("x", IntVal 6)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "*" [Number 3, Number 2]))]
 
-prop_expr :: Program -> Property
-prop_expr prog
- = case runProg prog of
-    Right _     -> counterexample "good" True
-    Left (Error reason) -> counterexample reason False
+testInterpMod = TestCase $
+    assertEqual "Interp modulo" (Right (fromList [("x", IntVal 1)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "%" [Number 5, Number 2]))]
+
+testInterpSub = TestCase $
+    assertEqual "Interp subtraction" (Right (fromList [("x", IntVal 3)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "-" [Number 5, Number 2]))]
+
+testInterpLessTrue = TestCase $
+    assertEqual "Interp less true" (Right (fromList [("x", TrueVal)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "<" [Number 2, Number 3]))]
+testInterpLessFalse = TestCase $
+    assertEqual "Interp less false" (Right (fromList [("x", FalseVal)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "<" [Number 3, Number 3]))]
+
+testInterpLessTrueString = TestCase $
+    assertEqual "Interp less string true" (Right (fromList [("x", TrueVal)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "<" [String "a", String "b"]))]
+testInterpLessFalseString = TestCase $
+    assertEqual "Interp less string false" (Right (fromList [("x", FalseVal)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "<" [String "a", String "a"]))]
+
+testInterpEqTrue = TestCase $
+    assertEqual "Interp eq true" (Right (fromList [("x", TrueVal)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "===" [Number 3, Number 3]))]
+testInterpEqFalse = TestCase $
+    assertEqual "Interp eq false" (Right (fromList [("x", FalseVal)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "===" [Number 3, Number 2]))]
+
+testInterpEqTrueString = TestCase $
+    assertEqual "Interp eq string true" (Right (fromList [("x", TrueVal)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "===" [String "a", String "a"]))]
+testInterpEqFalseString = TestCase $
+    assertEqual "Interp less string false" (Right (fromList [("x", FalseVal)])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "===" [String "a", String "b"]))]
+
+testInterpArrayNew = TestCase $
+    assertEqual "Interp Array.new()" (Right (fromList [("x", ArrayVal [UndefinedVal, UndefinedVal])])) $
+    runProg $ Prog [VarDecl "x" (Just (Call "Array.new" [Number 2]))]
 
 
-return []
-runTests = $quickCheckAll
+tests = TestList [
+    testInterpAdd,
+    testInterpAddNumberString,
+    testInterpAddStrings,
+    testInterpMult,
+    testInterpMod,
+    testInterpSub,
+    testInterpLessTrue,
+    testInterpLessFalse,
+    testInterpLessTrueString,
+    testInterpLessFalseString,
+    testInterpEqTrue,
+    testInterpEqFalse,
+    testInterpEqTrueString,
+    testInterpEqFalseString,
+    testInterpArrayNew
+    ]

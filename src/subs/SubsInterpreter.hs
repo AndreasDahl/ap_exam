@@ -69,12 +69,12 @@ instance Monad SubsM where
 
 eqOp :: Primitive
 eqOp [a, b] = if a == b then return TrueVal else return FalseVal
-eqOp _ = fail "'===' called with non-number arguments"
+eqOp _ = fail "'===' called with invalid arguments"
 
 lessOp :: Primitive
 lessOp [IntVal a, IntVal b] = if a < b then return TrueVal else return FalseVal
 lessOp [StringVal a, StringVal b] = if a < b then return TrueVal else return FalseVal
-lessOp _ = fail "'<' called with non-number arguments"
+lessOp _ = fail "'<' called with invalid arguments"
 
 mulOp :: Primitive
 mulOp [IntVal a, IntVal b] = return $ IntVal (a * b)
@@ -85,10 +85,11 @@ divOp [IntVal a, IntVal b] = return $ IntVal (a `mod` b)
 divOp _ = fail "'%' called with non-number arguments"
 
 plusOp :: Primitive
-plusOp [IntVal a, IntVal b] = return $ IntVal (a + b)
-plusOp [StringVal a, IntVal b] = return $ StringVal (a ++ show b)
-plusOp [IntVal a, StringVal b] = return $ StringVal (show a ++ b)
-plusOp _ = fail "'+' called with non-number arguments"
+plusOp [IntVal a, IntVal b]       = return $ IntVal (a + b)
+plusOp [StringVal a, IntVal b]    = return $ StringVal (a ++ show b)
+plusOp [IntVal a, StringVal b]    = return $ StringVal (show a ++ b)
+plusOp [StringVal a, StringVal b] = return $ StringVal $ a ++ b
+plusOp _ = fail "'+' called with invalid arguments"
 
 minusOp :: Primitive
 minusOp [IntVal a, IntVal b] = return $ IntVal (a - b)
