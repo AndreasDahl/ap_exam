@@ -33,24 +33,6 @@ instance Arbitrary ValidIdent where
 operators :: [String]
 operators = ["*", "%", "+", "-", "<", "==="]
 
-
--- Square root function
-(^!) :: Num a => a -> Int -> a
-(^!) x n = x^n
-
-squareRoot :: Int -> Int
-squareRoot 0 = 0
-squareRoot 1 = 1
-squareRoot n =
-   let twopows = iterate (^!2) 2
-       (lowerRoot, lowerN) =
-          last $ takeWhile ((n>=) . snd) $ zip (1:twopows) twopows
-       newtonStep x = div (x + div n x) 2
-       iters = iterate newtonStep (squareRoot (div n lowerN) * lowerRoot)
-       isRoot r  =  r^!2 <= n && n < (r+1)^!2
-  in  head $ dropWhile (not . isRoot) iters
-
-
 instance Arbitrary Expr where
     arbitrary = sized superArb
         where
@@ -81,7 +63,7 @@ instance Arbitrary Expr where
                     return $ Call opt [e1, e2]
             arrayArb :: Int -> Gen Expr
             arrayArb n | n <= 0 = return $ Array []
-            arrayArb n = let n' = squareRoot n in
+            arrayArb n = let n' = floor (sqrt (fromIntegral n)) in
                 do
                 exprs <- vectorOf n' (superArb n')
                 return $ Array exprs
