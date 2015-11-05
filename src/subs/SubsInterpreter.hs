@@ -156,8 +156,8 @@ evalExpr (Compr afor e) = do
             clearVar :: Ident -> SubsM ()
             clearVar name = SubsM clearVar'
                 where clearVar' c = Right ((), Map.delete name (fst c))
-            -- Do a function with a specific variable set to given value.
-            -- Returns the variable to it's original state afterwards.
+            -- Restore given ident to the value it had before the evaluation
+            -- of the SubsM, when the SubsM has evaluated.
             doWithTempVar :: Ident -> SubsM a -> SubsM a
             doWithTempVar i m = do
                 oldVar <- tryGetVar i

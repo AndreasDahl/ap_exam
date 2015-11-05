@@ -43,6 +43,43 @@ testTooLongNumberFail = TestCase $
 testTooLongNegativeNumberFail = TestCase $
     assertEqual "for numberParser \"-123456789\"" [] (parseEof numberParser "-123456789")
 
+-- Expr Parser
+
+testAssociativity = TestCase $
+    assertEqual "for exprParser \"a + b + c\""
+    [(Call "+" [Call "+" [Var "a", Var "b"], Var "c"],"")]
+    (parseEof exprParser "a + b + c")
+
+testMultAddPrecedence = TestCase $
+    assertEqual "for exprParser \"a + b * c\""
+    [(Call "+" [Var "a",Call "*" [Var "b", Var "c"]],"")]
+    (parseEof exprParser "a + b * c")
+
+testAssignmentPrecedence = TestCase $
+    assertEqual "for exprParser \"a = b + c\""
+    [(Assign "a" (Call "+" [Var "b", Var "c"]),"")] $
+    parseEof exprParser "a = b + c"
+
+testAssignmentAssociativity = TestCase $
+    assertEqual "for exprParser \"a = b = c\""
+    [(Assign "a" (Assign "b" (Var "c")),"")] $
+    parseEof exprParser "a = b = c"
+
+testCommaAssociativity = TestCase $
+    assertEqual "for exprParser \"a, b, c\""
+    [(Comma (Comma (Var "a") (Var "b")) (Var "c"), "")] $
+    parseEof exprParser "a, b, c"
+
+testCommaPrecedencePlus = TestCase $
+    assertEqual "for exprParser \"a + b, c + d"
+    [(Comma (Call "+" [Var "a", Var "b"]) (Call "+" [Var "c", Var "d"]), "")] $
+    parseEof exprParser "a + b, c + d"
+
+testCommaPrecedenceAssign = TestCase $
+    assertEqual "for exprParser \"a = b, c = d"
+    [(Comma (Assign "a"  (Var "b")) (Assign "c" (Var "d")), "")] $
+    parseEof exprParser "a = b, c = d"
+
 tests = TestList [
     testIdentParser,
     testValidIdentWithOnlyDigits,
@@ -52,7 +89,14 @@ tests = TestList [
     testGoodNegativeNumberParse,
     testBadNegativeNumberFail,
     testTooLongNumberFail,
-    testTooLongNegativeNumberFail]
+    testTooLongNegativeNumberFail,
+    testMultAddPrecedence,
+    testAssociativity,
+    testAssignmentPrecedence,
+    testAssignmentAssociativity,
+    testCommaAssociativity,
+    testCommaPrecedencePlus,
+    testCommaPrecedenceAssign]
 
 -- QuickCheck
 
@@ -97,24 +141,6 @@ prop_ValidNumber (Spaces sp) (VN n) = parseEof numberParser (sp ++ n) == [(Numbe
 newtype ValidExpr = VE String
     deriving (Eq, Show)
 
--- instance Arbitrary ValidExpr where
---     arbitrary = do
---         VN n <- arbitrary
---         VI i <- arbitrary
---         Spaces s1 <- arbitrary
---         Spaces s2 <- arbitrary
---         elements [VE n,
---                   VE "true",
---                   VE "false",
---                   VE "undefined",
---                   VE $ n ++ ", true",
---                   VE $ n ++ s1 ++ "*" ++ s2 ++ n,
---                   VE $ n ++ s1 ++ "/" ++ s2 ++ n,
---                   VE $ n ++ s1 ++ "+" ++ s2 ++ n,
---                   VE $ n ++ s1 ++ "-" ++ s2 ++ n,
---                   VE i,
---                   VE $ i ++ s1 ++ "=" ++ s2 ++ n]
-
 instance Arbitrary ValidExpr where
     arbitrary = do
         e <- arbitrary
@@ -122,6 +148,22 @@ instance Arbitrary ValidExpr where
 
 
 prop_ValidExpr (VE expr) = parseEof exprParser expr /= []
+
+-- Program Parser
+
+-- Syntactically valid program
+newtype ValidProgram = VP String
+    deriving (Eq, Show)
+
+instance Arbitrary ValidProgram where
+    arbitrary = do
+        e <- arbitrary
+        return $ VP (ppProg e)
+
+
+prop_ValidProgram (VP pg) = case parseString pg of
+    Right _ -> counterexample "good" True
+    Left (ParseError reason) -> counterexample reason False
 
 return []
 runTests = $quickCheckAll

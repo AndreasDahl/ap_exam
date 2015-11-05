@@ -55,21 +55,15 @@ instance Arbitrary Expr where
     arbitrary = sized superArb
         where
             superArb :: Int -> Gen Expr
-            superArb n = frequency [(5, commaArb n),
-                                    (10, constArb n),
+            superArb n = frequency [(10, constArb n),
                                     (5, simpleOptArb n),
+                                    (5, assignArb n),
+                                    (1, arrayComprArb n),
                                     (1, arrayArb n)]
-            commaArb :: Int -> Gen Expr
-            commaArb 0 = constArb 0
-            commaArb n = do
-                let n' = n `quot` 100
-                l <- superArb n'
-                r <- superArb n'
-                return $ Comma l r
             constArb :: Int -> Gen Expr
             constArb size = do
                 n <- choose(-99999999, 99999999)
-                VI i <- resize size arbitrary
+                VI i <- arbitrary
                 s <- vectorOf size $ arbitrary `suchThat` (/= '\'')
                 elements [Number n,
                           String s,
@@ -91,16 +85,53 @@ instance Arbitrary Expr where
                 do
                 exprs <- vectorOf n' (superArb n')
                 return $ Array exprs
+            assignArb :: Int -> Gen Expr
+            assignArb n = do
+                VI i <- arbitrary
+                expr <- superArb $ n-1
+                return $ Assign i expr
+            arrayComprArb :: Int -> Gen Expr
+            arrayComprArb n = do
+                ArrayForCompr afor <- arbitrary
+                expr <- superArb (n - 1)
+                return $ Compr afor expr
+
+instance Arbitrary ArrayCompr where
+    arbitrary = oneof [forGen, ifGen]
+        where
+            forGen = do
+                VI i <- arbitrary
+                expr <- arbitrary
+                next <- arbitrary
+                return $ ArrayForCompr (i, expr, next)
+            ifGen = do
+                expr <- arbitrary
+                next <- arbitrary
+                return $ ArrayIf expr next
 
 instance Arbitrary Stm where
-    
+    arbitrary = do
+        VI i <- arbitrary
+        expr <- arbitrary
+        mbExpr <- arbitrary
+        elements [ExprAsStm expr, VarDecl i mbExpr]
+
 
 instance Arbitrary Program where
     arbitrary = do
-        expr <- arbitrary
-        return $ Prog [ExprAsStm expr]
+        stms <- arbitrary
+        return $ Prog stms
 
+ppMbyCompr :: Maybe ArrayCompr -> String
+ppMbyCompr Nothing = ""
+ppMbyCompr (Just some) = prettyPrintArrayCompr some
 
+prettyPrintArrayCompr :: ArrayCompr -> String
+prettyPrintArrayCompr (ArrayForCompr (i, e, next)) =
+    "for (" ++ i ++ " of " ++ prettyPrintExpr e ++ ") " ++ ppMbyCompr next
+prettyPrintArrayCompr (ArrayIf e next) =
+    "if (" ++ prettyPrintExpr e ++ ") " ++ ppMbyCompr next
+    where
 
 prettyPrintExpr  :: Expr -> String
 prettyPrintExpr (Number n)    = show n
@@ -109,9 +140,23 @@ prettyPrintExpr Undefined     = "undefined"
 prettyPrintExpr TrueConst     = "true"
 prettyPrintExpr FalseConst    = "false"
 prettyPrintExpr (Var s)       = s
-prettyPrintExpr (Comma e1 e2) = prettyPrintExpr e1 ++ " , " ++ prettyPrintExpr e2
+prettyPrintExpr (Comma e1 e2) = prettyPrintExpr e1 ++ ", " ++ prettyPrintExpr e2
 prettyPrintExpr (Call opt (a:as)) = if opt `elem` operators
-    then prettyPrintExpr a ++ opt ++ prettyPrintExpr (head as)
+    then prettyPrintExpr a ++ " " ++ opt ++ " " ++ prettyPrintExpr (head as)
     else opt ++ "(" ++ concatMap prettyPrintExpr (a:as) ++ ")"
 prettyPrintExpr (Array exprs) = "[" ++ intercalate ", " (map prettyPrintExpr exprs) ++ "]"
+prettyPrintExpr (Assign i expr) = i ++ " = " ++ prettyPrintExpr expr
+prettyPrintExpr (Compr afor e) = "[ " ++ prettyPrintArrayCompr (ArrayForCompr afor) ++ prettyPrintExpr e ++ " ]"
 prettyPrintExpr _ = undefined
+
+ppStm :: Stm -> String
+ppStm (ExprAsStm e) = prettyPrintExpr e
+ppStm (VarDecl i mbyExpr) = "var " ++ i ++ " " ++ ppMbyExpr mbyExpr
+    where
+        ppMbyExpr Nothing = ""
+        ppMbyExpr (Just e) = "= " ++ prettyPrintExpr e
+
+ppProg :: Program -> String
+ppProg (Prog stms) = foldl f "" stms
+    where
+        f s stm = s ++ ppStm stm ++ ";\n"

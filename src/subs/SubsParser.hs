@@ -110,17 +110,7 @@ numberParser = do
 
 
 exprsParser :: Parser [Expr]
-exprsParser = nextParser
-    where
-        commaExprsParser :: Parser [Expr]
-        commaExprsParser = schar ',' >> nextParser
-                       <|> return []
-        nextParser :: Parser [Expr]
-        nextParser = do
-                        e <- expr1Parser
-                        c <- commaExprsParser
-                        return $ e : c
-                    <|> return []
+exprsParser = expr1Parser `sepBy` schar ','
 
 
 afterIdentParser :: Ident -> Parser Expr
@@ -183,15 +173,10 @@ expr1Parser = expr2 `gchainl1` mulOp `gchainl1` addOp `gchainl1` lessOp `gchainl
                     return $ Compr (i, e1, a) e2
 
 
-
 exprParser :: Parser Expr
-exprParser = do
-    e1 <- expr1Parser
-    _ <- schar ','
-    e2 <- exprParser
-    return $ Comma e1 e2
-    <|> expr1Parser
-
+exprParser = expr1Parser `chainl1` commaOp
+    where
+        commaOp = do { _ <- schar ','; return Comma }
 
 assignOptParser :: Parser (Maybe Expr)
 assignOptParser = option $ schar '=' >> expr1Parser
