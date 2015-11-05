@@ -2,10 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module SubsParserTest where
 
-import Control.Monad ( replicateM )
-import Test.HUnit
-import Test.QuickCheck
-import Data.Char
+import Test.QuickCheck( counterexample, Property, quickCheckAll )
 
 import SubsAst
 import SubsInterpreter
