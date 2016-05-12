@@ -2,13 +2,14 @@
 -export([start/2, stop/1, read/2, write/2, test/0]).
 
 
-%%%==================================================ß======================
+%%%=========================================================================
 %%%  API
 %%%=========================================================================
 
 % Returns {ok, ServerRef} on success or {error, Reason} if some error occurred.
 start(NumReplica, Mod) ->
-    gen_server:start({local, coordinator}, coordinator, [{replicas, NumReplica}, {mod, Mod}], []).
+    gen_server:start({local, coordinator}, coordinator, [{replicas, NumReplica},
+        {mod, Mod}], []).
 
 % Clients waiting for a read or write request should get the reply
 % {'ABORTED', server_stopped}.

@@ -94,7 +94,8 @@ testInterpEqFalseString = TestCase $
     runProg $ Prog [VarDecl "x" (Just (Call "===" [String "a", String "b"]))]
 
 testInterpArrayNew = TestCase $
-    assertEqual "Interp Array.new()" (Right (fromList [("x", ArrayVal [UndefinedVal, UndefinedVal])])) $
+    assertEqual "Interp Array.new()"
+    (Right (fromList [("x", ArrayVal [UndefinedVal, UndefinedVal])])) $
     runProg $ Prog [VarDecl "x" (Just (Call "Array.new" [Number 2]))]
 
 

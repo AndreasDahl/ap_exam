@@ -7,7 +7,6 @@ import Data.List
 import SubsAst
 
 
-
 newtype Spaces = Spaces String
     deriving (Eq, Show)
 
@@ -28,7 +27,8 @@ instance Arbitrary ValidIdent where
             firstCharGen :: Gen Char
             firstCharGen = arbitrary `suchThat` (\ c -> isLetter c || c == '_')
             stringGen :: Gen String
-            stringGen = listOf $ arbitrary `suchThat` (\ c -> isDigit c || isLetter c || c == '_')
+            stringGen = listOf $
+                arbitrary `suchThat` (\ c -> isDigit c || isLetter c || c == '_')
 
 operators :: [String]
 operators = ["*", "%", "+", "-", "<", "==="]
@@ -130,7 +130,8 @@ prettyPrintExpr (Call opt (a:as)) = if opt `elem` operators
     else opt ++ "(" ++ concatMap prettyPrintExpr (a:as) ++ ")"
 prettyPrintExpr (Array exprs) = "[" ++ intercalate ", " (map prettyPrintExpr exprs) ++ "]"
 prettyPrintExpr (Assign i expr) = i ++ " = " ++ prettyPrintExpr expr
-prettyPrintExpr (Compr afor e) = "[ " ++ prettyPrintArrayCompr (ArrayForCompr afor) ++ prettyPrintExpr e ++ " ]"
+prettyPrintExpr (Compr afor e) = "[ "
+    ++ prettyPrintArrayCompr (ArrayForCompr afor) ++ prettyPrintExpr e ++ " ]"
 prettyPrintExpr _ = undefined
 
 ppStm :: Stm -> String

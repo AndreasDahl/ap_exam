@@ -19,6 +19,13 @@ query(Aid, Pred) ->
 upsert(Aid, Id, F) ->
     gen_replicated:write(Aid, {Id, F}).
 
+test() ->
+    {ok, Aid} = start(),
+    upsert(Aid, 1, fun insert_a/1),
+    upsert(Aid, 2, fun insert_a/1),
+    query(Aid, fun even_key/1).
+
+% Internals for testing
 
 even_key({Key, _Value}) ->
     (Key rem 2) == 0.
@@ -30,9 +37,3 @@ insert_a({existing, {_Id, Data}}) ->
         true -> ignore;
         false -> {modify, a}
     end.
-
-test() ->
-    {ok, Aid} = start(),
-    upsert(Aid, 1, fun insert_a/1),
-    upsert(Aid, 2, fun insert_a/1),
-    query(Aid, fun even_key/1).

@@ -32,9 +32,11 @@ testInvalidIdentKeyword = TestCase $
 -- Number parser
 
 testGoodNumberParse = TestCase $
-    assertEqual "for numberParser \"12345678\"" [(Number 12345678, [])] (parseEof numberParser "12345678")
+    assertEqual "for numberParser \"12345678\"" [(Number 12345678, [])]
+    (parseEof numberParser "12345678")
 testGoodNegativeNumberParse = TestCase $
-    assertEqual "for numberParser \"-12345678\"" [(Number (-12345678), [])] (parseEof numberParser "-12345678")
+    assertEqual "for numberParser \"-12345678\"" [(Number (-12345678), [])]
+    (parseEof numberParser "-12345678")
 
 testBadNegativeNumberFail = TestCase $
     assertEqual "for numberParser \"- 12345678\"" [] (parseEof numberParser "- 12345678")
@@ -111,9 +113,11 @@ instance Arbitrary InvalidIdent where
         return $ II $ firstC : str
         where
             invalidFirstChar :: Gen Char
-            invalidFirstChar = arbitrary `suchThat` (\ c -> not (isSpace c || isLetter c || c == '_'))
+            invalidFirstChar =
+                arbitrary `suchThat` (\ c -> not (isSpace c || isLetter c || c == '_'))
             validTailGen :: Gen String
-            validTailGen = listOf $ arbitrary `suchThat` (\ c -> isDigit c || isLetter c || c == '_')
+            validTailGen = listOf $
+                arbitrary `suchThat` (\ c -> isDigit c || isLetter c || c == '_')
 
 
 prop_ValidIdent (Spaces sp)(VI s) = parseEof identParser (sp ++ s) == [(s, [])]
@@ -133,7 +137,8 @@ instance Arbitrary ValidNumber where
         n <- replicateM len (arbitrary `suchThat` isDigit)
         if mi then return $ VN $ '-' : n else return $ VN n
 
-prop_ValidNumber (Spaces sp) (VN n) = parseEof numberParser (sp ++ n) == [(Number $ read n, [])]
+prop_ValidNumber (Spaces sp) (VN n) =
+    parseEof numberParser (sp ++ n) == [(Number $ read n, [])]
 
 
 -- Expr Parser

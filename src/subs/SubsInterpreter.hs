@@ -1,9 +1,8 @@
-module SubsInterpreter
-    --    ( runProg
-    --    , Error (..)
-    --    , Value(..)
-    --    )
-       where
+module SubsInterpreter (
+  runProg,
+  Error (..),
+  Value(..)
+) where
 
 import SubsAst
 
@@ -176,14 +175,17 @@ evalExpr (Compr afor e) = do
                         mapM (\value -> updateEnv i value >> evalArrayCompr more) vs
                     StringVal s -> liftM concat $
                         doWithTempVar i $
-                        mapM (\char -> updateEnv i (StringVal [char]) >> evalArrayCompr more) s
-                    _ -> fail $ "Expression '" ++ show arrayE ++ "' should be an array or a string"
+                        mapM (\char -> updateEnv i
+                            (StringVal [char]) >> evalArrayCompr more) s
+                    _ -> fail $ "Expression '" ++ show arrayE
+                        ++ "' should be an array or a string"
             evalArrayCompr (Just (ArrayIf filt more)) = do
                 result <- evalExpr filt
                 case result of
                     TrueVal  -> evalArrayCompr more
                     FalseVal -> return []
-                    _        -> fail $ "if statement '" ++ show filt ++ "' should evaluate to a boolean"
+                    _        -> fail $ "if statement '" ++ show filt
+                                ++ "' should evaluate to a boolean"
 
 
 stm :: Stm -> SubsM ()
